@@ -1,0 +1,536 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+		<title>reveal.js</title>
+
+		<link rel="stylesheet" href="css/reveal.css">
+		<link rel="stylesheet" href="css/theme/beige.css">
+
+		<!-- Theme used for syntax highlighting of code -->
+		<link rel="stylesheet" href="lib/css/zenburn.css">
+
+        <link rel="stylesheet" href="vendor/highlight.js/styles/ocean.css">
+
+        
+        <style>
+            section {
+                padding: 0 !important;
+            }
+            pre code {
+                max-height: 100% !important;
+            }
+            img {
+                border: 0 !important;
+            }
+            .reveal .slides section .fragment.current-only {
+                opacity: 1;
+                visibility: visible;
+                display: none;
+            }
+            .reveal .slides section .fragment.current-only.current-fragment {
+                display: block;
+            }
+            .line {
+                display: block;
+            }
+            .line.focus {
+                background: #111;
+                font-weight: bold;
+            }
+        </style>
+
+		<!-- Printing and PDF exports -->
+		<script>
+			var link = document.createElement( 'link' );
+			link.rel = 'stylesheet';
+			link.type = 'text/css';
+			link.href = window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css';
+			document.getElementsByTagName( 'head' )[0].appendChild( link );
+		</script>
+	</head>
+	<body>
+		<div class="reveal">
+			<div class="slides">
+				
+				<section data-background="images/title-slide-background.png">
+                    <h2>Faster end-to-end tests with fixture factories</h2>
+                    <p><small>Stephan Jaensch<br />@s_jaensch</small></p>
+				</section>
+
+				<section data-background="images/slide-background.png">
+					<h3>Yelp's mission</h3>
+
+					<p>To connect people to great local businesses</p>
+
+					<img src="images/yelp_mission_icons.png" style="box-shadow: none;" />
+
+					<aside class="notes">
+						<ul>
+							<li></li>
+						</ul>
+					</aside>
+				</section>
+
+				<section data-background="images/slide-background.png">
+					<h3>What I'll talk about</h3>
+
+					<ul>
+					    <li>What are end-to-end tests?</li>
+						<li>The problem with setting up end-to-end tests</li>
+						<li>How do fixture (or data) factories help solve the problem?</li>
+						<li>How can we make tests faster?</li>
+					</ul>
+
+					<aside class="notes">
+						<ul>
+							<li>Fixtures are setup tasks that need to happen so you can test your code</li>
+						    <li>In our case it's mostly inserting data</li>
+						</ul>
+				</section>
+
+
+				<section data-background="images/slide-background.png">
+					<h3>End-to-end tests - the what and why</h3>
+
+					<img src="images/testing_pyramid.jpg" style="height: 450px" />
+
+					<p style="font-size: xx-small;">Source: https://www.ministryoftesting.com/wp-content/uploads/2014/10/typical_pyramid.jpg</p>
+
+					<aside class="notes">
+						<ul>
+							<li>Sometimes also called system tests, integration tests, acceptance tests</li>
+							<li>The lowest, most expensive tests to run</li>
+							<li>Verify that everything works together, crucial in a distributed architecture</li>
+						</ul>
+					</aside>
+				</section>
+
+				<section data-background="images/slide-background.png">
+					<h3>Our service technology stack</h3>
+
+					<img src="images/pyramid_logo.png" style="float: left; box-shadow: none; margin: 2%; width: 28%" />
+					<img src="images/openapi_logo.png" style="float: left; box-shadow: none; margin: 2%; width: 28%" />
+					<img src="images/sqlalchemy_logo.png" style="float: left; box-shadow: none; margin: 2%; width: 28%" />
+					
+					<aside class="notes">
+						<ul>
+							<li>distributed services means code split up across repositories</li>
+							<li>separated by network layer</li>
+							<li>services spun up separately, each in its own Docker container</li>
+							<li>Need to create state in all dependant services</li>
+						</ul>
+					</aside>
+				</section>
+
+				<section data-background="images/slide-background.png">
+					<h3>What's hard about E2E tests?</h3>
+
+					<img src="images/distributed_services.png" />
+
+					<p style="font-size: xx-small;">Source: https://www.slideshare.net/danveloper/microservices-the-right-way</p>
+					
+					<aside class="notes">
+						<ul>
+							<li>distributed services means code split up across repositories</li>
+							<li>separated by network layer</li>
+							<li>services spun up separately, each in its own Docker container</li>
+							<li>Need to create state in all dependant services</li>
+						</ul>
+					</aside>
+				</section>
+
+				<section data-background="images/slide-background.png">
+					<h3>Creating E2E test state</h3>
+
+					<img src="images/sql_fixtures.png" />
+					
+					<p>Lots of SQL statements...</p>
+
+					<aside class="notes">
+						<ul>
+							<li>We mostly use MySQL, Cassandra and ElasticSearch</li>
+							<li>Going to use MySQL as an example throughout this talk</li>
+							<li>Tight coupling to downstream datastores</li>
+							<li>Hard to write, hard to get right, hard to maintain</li>
+						</ul>
+					</aside>
+				</section>
+
+				<section data-background="images/slide-background.png">
+					<h3>Taking inspiration from Django</h3>
+
+					<img src="images/django_fixtures.png" />
+					
+					<p>...but for downstream services as well</p>
+					<p>...and without code duplication</p>
+
+					<aside class="notes">
+						<ul>
+							<li>Want a Python API to create test data on a per-test basis</li>
+							<li>We don't use Django internally, but Pyramid + SQLAlchemy</li>
+						</ul>
+					</aside>
+				</section>
+
+
+				<section data-background="images/slide-background.png">
+					<h3>Testing factory libraries</h3>
+
+					<img src="images/model_packages.png" />
+
+					<ul>
+						<li>Contain SQLAlchemy models as well as factory functions</li>
+						<li>Factories provide a slightly higher level of abstraction</li>
+						<li>Take care of common default values</li>
+						<li>Make sure data is logically correct</li>
+					</ul>
+
+					<aside class="notes">
+						<ul>
+							<li>logically correct: creating rows in multiple tables where necessary</li>
+							<li>As do other companies that run MySQL at scale, we disable foreign key checks, so we can't rely on the database telling us when we forgot something</li>
+						</ul>
+					</aside>
+				</section>
+
+
+				<section data-background="images/slide-background.png">
+					<h3>Test - before</h3>
+
+					<pre><code class="python" data-trim>
+def test_get_answer_list_empty_list(testapp):
+    response = testapp.get(
+        '/business/{business_id}/question/'
+        '{question_id}/answer/v1'.format(
+            business_id=encrypt_id(3),
+            question_id=encrypt_id(2),
+        ),
+        params={
+            'limit': LIMIT,
+            'offset': OFFSET,
+        },
+    )
+
+    assert response.json == {…}
+					</code></pre>
+
+                    <p class="fragment" data-code-focus="3"></p>
+                    <p class="fragment" data-code-focus="4"></p>
+                    <p class="fragment" data-code-focus="5"></p>
+                    <p class="fragment" data-code-focus="6"></p>
+
+					<aside class="notes">
+						<ul>
+							<li>We're passing in two IDs in the URL path</li>
+							<li>These are hardcoded in the test and correspond to IDs in SQL statements</li>
+						</ul>
+					</aside>
+				</section>
+
+
+				<section data-background="images/slide-background.png">
+					<h3>Test - after</h3>
+
+					<pre><code class="python" data-trim>
+def test_get_answer_list_empty_list(testapp, question, business_id):
+    response = testapp.get(
+        '/business/{business_id}/question/'
+        '{question_id}/answer/v1'.format(
+            business_id=encrypt_id(business_id),
+            question_id=encrypt_id(question.id),
+        ),
+        params={
+            'limit': LIMIT,
+            'offset': OFFSET,
+        },
+    )
+
+    assert response.json == {…}
+    				</code></pre>
+
+                    <p class="fragment" data-code-focus="1"></p>
+                    <p class="fragment" data-code-focus="5"></p>
+                    <p class="fragment" data-code-focus="6"></p>
+
+
+					<aside class="notes">
+						<ul>
+							<li>pytest allows us to use fixture functions by having arguments of the same name</li>
+							<li>We use two new pytest fixture factories</li>
+							<li>IDs are not hardcoded anymore, but the result of running those pytest fixture functions</li>
+							<li>We get to remove the SQL statements for this test</li>
+						</ul>
+					</aside>
+				</section>
+
+
+				<section data-background="images/slide-background.png">
+					<h3>The business fixture</h3>
+
+					<pre><code class="python" data-trim>
+@pytest.fixture
+def business_id(db_session):
+    return business_factory.create(db_session)
+    				</code></pre>
+
+    				<pre class="fragment"><code class="python" data-trim>
+def create(
+    session,
+    name='Levchins',
+    …
+):
+    business = Business(
+        name=name,
+        …
+    )
+    session.add(business)
+    session.commit()
+    return business.id
+    				</code></pre>
+
+					<aside class="notes">
+						<ul>
+							<li>Business fixture extremely short, uses one other pytest fixture</li>
+							<li>The create method is just a wrapper around an SQLAlchemy model</li>
+							<li>Provides reasonable defaults and DRY</li>
+						</ul>
+					</aside>
+				</section>
+
+
+				<section data-background="images/slide-background.png">
+					<h3>Why not use models directly?</h3>
+
+					<img src="images/biz_user_relationship.png" style="box-shadow: none;" />
+
+					<aside class="notes">
+						<ul>
+							<li>Some relational data needs to be created at the same time</li>
+							<li>We disable constraint checking in MySQL for scalability</li>
+							<li>All users have an email</li>
+							<li>If a business user has a business then let's create that relationship on user creation</li>
+							<li>This should mirror what your non-test code does when creating the database entries</li>
+						</ul>
+					</aside>
+				</section>
+
+
+				<section data-background="images/slide-background.png">
+					<h3>Why not use models directly?</h3>
+
+					<pre><code class="python" data-trim>
+def biz_user_create(session, business_id=None, email=None, …):
+    """Creates a biz_user with password 'password'"""
+    biz_user = BizUser(
+    	…
+    )
+    session.add(biz_user)
+    session.flush()
+
+    session.add(
+        BizUserPrivate(
+            biz_user_id=biz_user.id,
+            email=email,
+        )
+    )
+
+    if business_id:
+        add_biz_user_to_business(session, biz_user.id, business_id)
+
+    session.commit()
+
+    return biz_user.id
+    				</code></pre>
+
+                    <p class="fragment" data-code-focus="9-14"></p>
+                    <p class="fragment" data-code-focus="17"></p>
+
+					<aside class="notes">
+						<ul>
+							<li>We insert data in at least two tables</li>
+							<li>Optionally inserting into a third table as well, using a function that can also be called independently</li>
+						</ul>
+					</aside>
+				</section>
+
+
+				<section data-background="images/slide-background.png">
+					<h3>Downstream services with data creation APIs</h3>
+
+					<pre><code class="python" data-trim>
+@pytest.fixture
+def question(question_answer_client, business_id, confirmed_user_id):
+    return question_answer_client.business.create_question(
+        body={
+            'text': 'Test question...?',
+            'platform_source': 'other',
+            'subscription': False,
+        },
+        business_id=business_id,
+    ).result().question
+    				</code></pre>
+
+					<aside class="notes">
+						<ul>
+							<li>question_answer_client is a Swagger client, a tool for communicating between services</li>
+							<li>This fixture expects the data creation API to work</li>
+							<li>Sometimes you're using that same API during other tests</li>
+							<li>Depending on test execution order you'll get a failure during fixture execution, which is harder to debug</li>
+						</ul>
+					</aside>
+				</section>
+
+
+				<section data-background="images/slide-background.png">
+					<h3>Pros and Cons</h3>
+
+					<ul>
+						<li>Natural fit for pytest fixtures</li>
+						<li class="fragment">Much easier data creation</li>
+						<li class="fragment">People create separate data entries for each test "automatically"</li>
+						<li class="fragment">Need to maintain data creation factories</li>
+						<li class="fragment">Potentially slower (not sharing data across tests)</li>
+					</ul>
+
+					<aside class="notes">
+						<ul>
+							<li>You can slowly migrate to data creation factories</li>
+							<li>No need to rewrite existing tests</li>
+							<li>Code in different codebases always adds some maintenance overhead</li>
+							<li>Use models from your data creation package in your service codebase if possible</li>
+						</ul>
+					</aside>
+				</section>
+
+
+				<section data-background="images/slide-background.png">
+					<h3>How to make tests faster</h3>
+
+					<img src="images/parallel_test_execution.jpg" style="width: 80%" />
+
+					<p style="font-size: xx-small;">Source: http://www.methodsandtools.com/tools/selendroid.html</p>
+
+					<aside class="notes">
+						<ul>
+							<li>Two issues with end-to-end tests that write data</li>
+							<li>Tests not repeatable</li>
+							<li>Tests dependant on execution order</li>
+							<li>Both issues solved by using fixtures with data factories</li>
+						</ul>
+					</aside>
+				</section>
+
+
+				<section data-background="images/slide-background.png">
+					<h3>Execute tests in parallel with pytest</h3>
+
+					<pre><code class="python" data-trim>
+$ pip install pytest-xdist
+$ python -m pytest -s -vvv -n 4 tests/acceptance
+					</code></pre>
+
+					<img class="fragment" src="images/fix_tests_prelaunch.png" />
+
+					<aside class="notes">
+						<ul>
+							<li>We didn't observe significant speedups beyond four processes</li>
+							<li>reduced test execution time by ~60% compared to old setup</li>
+							<li>Creating the test environment (spinning up services) still takes a significant amount of time</li>
+							<li>Faster iteration when developing since you don't need to tear down and recreate it</li>
+						</ul>
+					</aside>
+				</section>
+
+
+				<section data-background="images/slide-background.png">
+					<h3>Execute tests in parallel with pytest</h3>
+
+					<img src="images/fix_tests_postlaunch.png" />
+
+					<aside class="notes">
+						<ul>
+							<li>Generally tests doing writes and sharing fixtures with tests that do reads are problematic</li>
+							<li>The issue comes with tests that share these fixtures - one expects a certain state, the other changes the state</li>
+							<li>The tests rely on a deterministic execution order - randomizing test execution order would make them just as flaky</li>
+						</ul>
+					</aside>
+				</section>
+
+                
+                <section data-background="images/slide-background.png">
+                    <h3>Takeaways</h3>
+
+                    <ul>
+                        <li>Use fixture factories for <strong>faster development</strong> and more correct test data</li>
+                        <li class="fragment">Convert tests for <strong>test isolation and repeatability</strong></li>
+                        <li class="fragment">Take advantage of it by executing tests in <strong>parallel</strong></li>
+                    </ul>
+
+                    <aside class="notes">
+                    	<ul>
+                            <li>In summary, what we're aiming for is increasing both developer productivity as well as
+                                developer happiness.</li>
+                            <li>If tests are not as hard to write developers are more likely to write them</li>
+                        </ul>
+                    </aside>
+                </section>
+
+
+                <section data-background="images/slide-background.png">
+                    <h3>Other talks by Yelpers</h3>
+
+                    <p>"Write more decorators (and fewer classes)"<br />by Antonio Verardi; Tuesday, 10:30, Anfiteatro 2</p>
+                    <p>"Teeing up Python: Code Golf"<br />by Lee Sheng; Wednesday, 12:10, PyCharm Room</p>
+
+                    <aside class="notes">
+                    </aside>
+                </section>
+
+
+                <section data-background="images/check_out_yelp.png">
+                	<br />
+                    <aside class="notes">
+                        <p>European offices!</p>
+                    </aside>
+                </section>
+
+
+                <section data-background="images/slide-background.png">
+                    <h2>Questions?</h2>
+
+                    <p>&nbsp;</p>
+                    <p>sjaensch@yelp.com / @s_jaensch</p>
+                    <p>https://github.com/sjaensch/faster_end_to_end_tests_talk.git</p>
+                </section>
+
+			</div>
+		</div>
+
+		<script src="lib/js/head.min.js"></script>
+		<script src="js/reveal.js"></script>
+
+		<script>
+			// More info https://github.com/hakimel/reveal.js#configuration
+			Reveal.initialize({
+				history: true,
+                center: true,
+                controls: false,
+                /*width: '100%',
+                height: '100%', */
+
+				// More info https://github.com/hakimel/reveal.js#dependencies
+				// { src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } }
+				dependencies: [
+					{ src: 'plugin/markdown/marked.js' },
+					{ src: 'plugin/markdown/markdown.js' },
+					{ src: 'plugin/notes/notes.js', async: true },
+                    { src: 'vendor/highlight.js/highlight.pack.js' },
+                    { src: 'node_modules/reveal-code-focus/reveal-code-focus.js', callback: function() { RevealCodeFocus(); } }
+				]
+			});
+		</script>
+	</body>
+</html>
